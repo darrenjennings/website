@@ -12,6 +12,7 @@ import Svg from './Svg';
 import { colors, media } from './styles';
 
 import type {
+  BabelState,
   EnvConfig,
   PluginConfig,
   PluginState,
@@ -23,6 +24,7 @@ type ToggleExpanded = (isExpanded: boolean) => void;
 type ToggleSetting = (name: string, isEnabled: boolean) => void;
 
 type Props = {
+  babel: BabelState,
   builtIns: boolean,
   className: string,
   debugEnvPreset: boolean,
@@ -58,8 +60,41 @@ class ExpandedContainer extends Component {
     className: ''
   };
 
+  renderVersion() {
+    const babel = this.props.babel;
+
+    let meta;
+
+    if (babel.circleciRepo || babel.build) {
+      meta = (
+        <div className={styles.versionMeta}>
+          {babel.circleciRepo && (
+            <div className={styles.versionMetaItem}>
+              <strong>REPO</strong>
+              <span>{babel.circleciRepo}</span>
+            </div>
+          )}
+          {babel.build && (
+            <div className={styles.versionMetaItem}>
+              <strong>BUILD</strong>
+              <span>{babel.build}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.version}>
+        <div className={styles.versionName}>{window.Babel.version}</div>
+        {meta}
+      </div>
+    );
+  }
+
   render() {
     const {
+      babel,
       builtIns,
       debugEnvPreset,
       envConfig,
@@ -73,150 +108,164 @@ class ExpandedContainer extends Component {
       runtimePolyfillState
     } = this.props;
 
+    if (!babel.isLoaded) {
+      if (babel.isLoading) {
+        return (
+          <div className={styles.expandedContainer}>
+            <PresetLoadingAnimation className={styles.loader} />
+          </div>
+        );
+      }
+
+      // TODO: handle didError
+    }
+
     const disableEnvSettings =
       !envPresetState.isLoaded || !envConfig.isEnvPresetEnabled;
 
     return (
       <div className={styles.expandedContainer}>
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>Settings</div>
-          <PluginToggle
-            config={runtimePolyfillConfig}
-            label="Evaluate"
-            onSettingChange={onSettingChange}
-            state={runtimePolyfillState}
-          />
-          <label className={styles.settingsLabel}>
-            <input
-              checked={lineWrap}
-              onChange={this._onLineWrappingChange}
-              className={styles.inputCheckboxLeft}
-              type="checkbox"
-            />
-            Line Wrap
-          </label>
-          {pluginConfigs.map(config =>
+        {this.renderVersion()}
+        <div className={styles.sectionWrapper}>
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>Settings</div>
             <PluginToggle
-              config={config}
-              key={config.package}
+              config={runtimePolyfillConfig}
+              label="Evaluate"
               onSettingChange={onSettingChange}
-              state={pluginState[config.package]}
+              state={runtimePolyfillState}
             />
-          )}
-        </div>
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>Presets</div>
-          {presetPluginConfigs.map(config =>
-            <PluginToggle
-              config={config}
-              key={config.package}
-              onSettingChange={onSettingChange}
-              state={presetState[config.package]}
-            />
-          )}
-        </div>
-        <div className={`${styles.section} ${styles.sectionEnv}`}>
-          <label
-            className={`${styles.sectionHeader} ${styles.sectionEnvHeader}`}
-          >
-            {envPresetState.isLoading
-              ? <PresetLoadingAnimation />
-              : 'Env Preset'}
-
-            <input
-              checked={envConfig.isEnvPresetEnabled}
-              type="checkbox"
-              onChange={this._onEnvPresetEnabledChange}
-            />
-          </label>
-          <div className={styles.envPresetColumn}>
-            <label
-              className={`${styles.envPresetColumnLabel} ${styles.highlight}`}
-            >
-              Browser
+            <label className={styles.settingsLabel}>
+              <input
+                checked={lineWrap}
+                onChange={this._onLineWrappingChange}
+                className={styles.inputCheckboxLeft}
+                type="checkbox"
+              />
+              Line Wrap
             </label>
-            <textarea
-              disabled={disableEnvSettings}
-              className={styles.envPresetInput}
-              onChange={this._onBrowsersChange}
-              placeholder={envPresetDefaults.browsers.placeholder}
-              value={envConfig.browsers}
-            />
+            {pluginConfigs.map(config =>
+              <PluginToggle
+                config={config}
+                key={config.package}
+                onSettingChange={onSettingChange}
+                state={pluginState[config.package]}
+              />
+            )}
           </div>
-          <label className={styles.envPresetRow}>
-            <span className={`${styles.envPresetLabel} ${styles.highlight}`}>
-              Electron
-            </span>
-            <input
-              className={`${styles.envPresetNumber} ${styles.envPresetInput}`}
-              disabled={
-                !envPresetState.isLoaded ||
-                !envConfig.isEnvPresetEnabled ||
-                !envConfig.isElectronEnabled
-              }
-              type="number"
-              min={envPresetDefaults.electron.min}
-              max={999}
-              step={envPresetDefaults.electron.step}
-              onChange={this._onElectronChange}
-              value={envConfig.electron}
-            />
-            <input
-              checked={envConfig.isElectronEnabled}
-              className={styles.envPresetCheckbox}
-              disabled={disableEnvSettings}
-              onChange={this._onIsElectronEnabledChange}
-              type="checkbox"
-            />
-          </label>
-          <label className={styles.envPresetRow}>
-            <span className={`${styles.envPresetLabel} ${styles.highlight}`}>
-              Node
-            </span>
-            <input
-              className={`${styles.envPresetNumber} ${styles.envPresetInput}`}
-              disabled={
-                !envPresetState.isLoaded ||
-                !envConfig.isEnvPresetEnabled ||
-                !envConfig.isNodeEnabled
-              }
-              type="number"
-              min={envPresetDefaults.node.min}
-              max={999}
-              step={envPresetDefaults.node.step}
-              onChange={this._onNodeChange}
-              value={envConfig.node}
-            />
-            <input
-              checked={envConfig.isNodeEnabled}
-              className={styles.envPresetCheckbox}
-              disabled={disableEnvSettings}
-              onChange={this._onIsNodeEnabledChange}
-              type="checkbox"
-            />
-          </label>
-          <label className={styles.settingsLabel}>
-            <input
-              checked={builtIns}
-              className={styles.inputCheckboxLeft}
-              disabled={runtimePolyfillState.isEnabled || disableEnvSettings}
-              onChange={this._onBuiltInsChange}
-              type="checkbox"
-            />
-            Built-ins
-          </label>
-          <label className={styles.settingsLabel}>
-            <input
-              checked={debugEnvPreset}
-              className={styles.inputCheckboxLeft}
-              disabled={disableEnvSettings}
-              onChange={this._onDebugChange}
-              type="checkbox"
-            />
-            Debug
-          </label>
-        </div>
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>Presets</div>
+            {presetPluginConfigs.map(config =>
+              <PluginToggle
+                config={config}
+                key={config.package}
+                onSettingChange={onSettingChange}
+                state={presetState[config.package]}
+              />
+            )}
+          </div>
+          <div className={`${styles.section} ${styles.sectionEnv}`}>
+            <label
+              className={`${styles.sectionHeader} ${styles.sectionEnvHeader}`}
+            >
+              {envPresetState.isLoading
+                ? <PresetLoadingAnimation />
+                : 'Env Preset'}
 
+              <input
+                checked={envConfig.isEnvPresetEnabled}
+                type="checkbox"
+                onChange={this._onEnvPresetEnabledChange}
+              />
+            </label>
+            <div className={styles.envPresetColumn}>
+              <label
+                className={`${styles.envPresetColumnLabel} ${styles.highlight}`}
+              >
+                Browser
+              </label>
+              <textarea
+                disabled={disableEnvSettings}
+                className={styles.envPresetInput}
+                onChange={this._onBrowsersChange}
+                placeholder={envPresetDefaults.browsers.placeholder}
+                value={envConfig.browsers}
+              />
+            </div>
+            <label className={styles.envPresetRow}>
+              <span className={`${styles.envPresetLabel} ${styles.highlight}`}>
+                Electron
+              </span>
+              <input
+                className={`${styles.envPresetNumber} ${styles.envPresetInput}`}
+                disabled={
+                  !envPresetState.isLoaded ||
+                  !envConfig.isEnvPresetEnabled ||
+                  !envConfig.isElectronEnabled
+                }
+                type="number"
+                min={envPresetDefaults.electron.min}
+                max={999}
+                step={envPresetDefaults.electron.step}
+                onChange={this._onElectronChange}
+                value={envConfig.electron}
+              />
+              <input
+                checked={envConfig.isElectronEnabled}
+                className={styles.envPresetCheckbox}
+                disabled={disableEnvSettings}
+                onChange={this._onIsElectronEnabledChange}
+                type="checkbox"
+              />
+            </label>
+            <label className={styles.envPresetRow}>
+              <span className={`${styles.envPresetLabel} ${styles.highlight}`}>
+                Node
+              </span>
+              <input
+                className={`${styles.envPresetNumber} ${styles.envPresetInput}`}
+                disabled={
+                  !envPresetState.isLoaded ||
+                  !envConfig.isEnvPresetEnabled ||
+                  !envConfig.isNodeEnabled
+                }
+                type="number"
+                min={envPresetDefaults.node.min}
+                max={999}
+                step={envPresetDefaults.node.step}
+                onChange={this._onNodeChange}
+                value={envConfig.node}
+              />
+              <input
+                checked={envConfig.isNodeEnabled}
+                className={styles.envPresetCheckbox}
+                disabled={disableEnvSettings}
+                onChange={this._onIsNodeEnabledChange}
+                type="checkbox"
+              />
+            </label>
+            <label className={styles.settingsLabel}>
+              <input
+                checked={builtIns}
+                className={styles.inputCheckboxLeft}
+                disabled={runtimePolyfillState.isEnabled || disableEnvSettings}
+                onChange={this._onBuiltInsChange}
+                type="checkbox"
+              />
+              Built-ins
+            </label>
+            <label className={styles.settingsLabel}>
+              <input
+                checked={debugEnvPreset}
+                className={styles.inputCheckboxLeft}
+                disabled={disableEnvSettings}
+                onChange={this._onDebugChange}
+                type="checkbox"
+              />
+              Debug
+            </label>
+          </div>
+        </div>
         <div
           className={`${styles.closeButton} ${nestedCloseButton}`}
           onClick={() => onIsExpandedChange(false)}
@@ -351,7 +400,7 @@ const styles = {
 
       [media.large]: {
         transition: 'left 0.25s ease-in-out',
-        left: '-0.5rem'
+        left: '-0.25rem'
       }
     },
 
@@ -362,41 +411,49 @@ const styles = {
         },
 
         [media.large]: {
-          left: 0
+          left: '0.25rem',
         }
       }
     }
   }),
   expandedContainer: css({
-    minWidth: '150px',
+    minWidth: '180px',
     display: 'flex',
-    overflow: 'auto',
-    boxSshadow:
+    flexDirection: 'column',
+    boxShadow:
       'rgba(0, 0, 0, 0.12) 0px 1px 6px, rgba(0, 0, 0, 0.24) 0px 1px 4px',
+
+    [`& .${nestedCloseButton}`]: {
+      bottom: '-1.5rem',
+    },
+
+    [media.large]: {
+      height: '100vh',
+
+      [`& .${nestedCloseButton}`]: {
+        right: '-1.75rem',
+      },
+    },
+  }),
+  sectionWrapper: css({
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    overflow: 'auto',
 
     [media.large]: {
       flexDirection: 'column',
+      flexWrap: 'nowrap',
       height: '100%',
 
       [`& .${nestedCloseButton}`]: {
         right: '-1.5rem'
       }
     },
-
-    [media.mediumAndDown]: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      overflow: 'auto',
-
-      [`& .${nestedCloseButton}`]: {
-        bottom: '-1.5rem'
-      }
-    }
   }),
   closeButton: css({
     position: 'absolute',
     display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
     cursor: 'pointer',
     backgroundColor: colors.inverseBackground,
@@ -404,14 +461,15 @@ const styles = {
 
     [media.large]: {
       height: '4rem',
-      width: '2rem',
+      width: '1.75rem',
       top: 'calc(50% - 2rem)',
       borderTopRightRadius: '4rem',
       borderBottomRightRadius: '4rem'
     },
 
     [media.mediumAndDown]: {
-      height: '2rem',
+      height: '1.75rem',
+      justifyContent: 'center',
       width: '4rem',
       left: 'calc(50% - 2rem)',
       borderBottomLeftRadius: '4rem',
@@ -519,5 +577,62 @@ const styles = {
     '&:disabled': {
       opacity: 0.5
     }
-  })
+  }),
+  loader: css({
+    margin: 'auto'
+  }),
+  version: css({
+    background: '#2d333b',
+    display: 'flex',
+    padding: '1rem',
+
+    [media.large]: {
+      flexDirection: 'column',
+    },
+  }),
+  versionName: css({
+    flex: 1,
+    fontWeight: 700,
+
+    [media.large]: {
+      margin: '0 0 0.25rem',
+    },
+  }),
+  versionMeta: css({
+    display: 'flex',
+    margin: '0 0 0 1rem',
+    maxWidth: '150px',
+
+    [media.large]: {
+      flexDirection: 'column',
+      margin: '0.5rem 0 0',
+    },
+  }),
+  versionMetaItem: css({
+    alignItems: 'center',
+    display: 'flex',
+    fontSize: '0.875rem',
+    minWidth: '50px',
+    maxWidth: '120px',
+    overflow: 'hidden',
+
+    '& + &': {
+      margin: '0 0 0 0.25rem',
+
+      [media.large]: {
+        margin: 0,
+      },
+    },
+
+    '& strong': {
+      flex: '0 0 2.6rem',
+      fontSize: '0.7rem',
+    },
+
+    '& span': {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    },
+  }),
 };

@@ -1,8 +1,8 @@
 import { css } from 'glamor';
 import React from 'react';
 
-const PresetLoadingAnimation = () =>
-  <div className={styles.loadingAnimation}>
+const PresetLoadingAnimation = ({ className }) =>
+  <div className={`${className || ''} ${styles.loadingAnimation}`}>
     <div className={`${styles.loadingTick} ${styles.loadingTick1}`} />
     <div className={`${styles.loadingTick} ${styles.loadingTick2}`} />
     <div className={`${styles.loadingTick} ${styles.loadingTick3}`} />

@@ -7,6 +7,7 @@ import ReplOptions from './ReplOptions';
 import StorageService from './StorageService';
 import UriUtils from './UriUtils';
 import compile from './compile';
+import loadBabel from './loadBabel';
 import loadPlugin from './loadPlugin';
 import {
   envPresetConfig,
@@ -20,12 +21,14 @@ import {
   loadPersistedState,
   configArrayToStateMap,
   configToState,
+  persistedStateToBabelState,
   persistedStateToEnvConfig
 } from './replUtils';
 import { media } from './styles';
 
 import type {
   BabelPresets,
+  BabelState,
   EnvConfig,
   PluginState,
   PluginStateMap,
@@ -34,6 +37,7 @@ import type {
 
 type Props = {};
 type State = {
+  babel: BabelState,
   builtIns: boolean,
   code: string,
   compiled: ?string,
@@ -47,7 +51,7 @@ type State = {
   lineWrap: boolean,
   plugins: PluginStateMap,
   presets: PluginStateMap,
-  runtimePolyfillState: PluginState
+  runtimePolyfillState: PluginState,
 };
 
 export default class Repl extends React.Component {
@@ -81,9 +85,12 @@ export default class Repl extends React.Component {
 
     // A partial State is defined first b'c this._compile needs it.
     // The compile helper will then populate the missing State values.
-    const state = {
+    this.state = {
+      babel: persistedStateToBabelState(persistedState),
       builtIns: persistedState.builtIns,
+      build: persistedState.build,
       code: persistedState.code,
+      circleciRepo: persistedState.circleciRepo,
       compiled: null,
       compileError: null,
       debugEnvPreset: persistedState.debug,
@@ -101,16 +108,10 @@ export default class Repl extends React.Component {
       runtimePolyfillState: configToState(
         runtimePolyfillConfig,
         persistedState.evaluate
-      )
+      ),
     };
 
-    this.state = {
-      ...state,
-      ...this._compile(persistedState.code, state)
-    };
-
-    // Load any plug-ins enabled by query params
-    this._checkForUnloadedPlugins();
+    this._setupBabel();
   }
 
   render() {
@@ -123,6 +124,7 @@ export default class Repl extends React.Component {
     return (
       <div className={styles.repl}>
         <ReplOptions
+          babel={state.babel}
           builtIns={state.builtIns}
           className={styles.optionsColumn}
           debugEnvPreset={state.debugEnvPreset}
@@ -158,6 +160,27 @@ export default class Repl extends React.Component {
         </div>
       </div>
     );
+  }
+
+  _setupBabel() {
+    loadBabel(this.state.babel, success => {
+      this.setState(state => {
+        const babelState = state.babel;
+
+        if (success) {
+          babelState.isLoaded = true;
+          babelState.isLoading = false;
+        } else {
+          babelState.didError = true;
+          babelState.isLoading = false;
+        }
+
+        return {
+          babel: babelState,
+          ...this._compile(state.code, state),
+        };
+      }, () => this._checkForUnloadedPlugins());
+    });
   }
 
   _checkForUnloadedPlugins() {
@@ -351,6 +374,8 @@ export default class Repl extends React.Component {
 
     const state = {
       babili: plugins['babili-standalone'].isEnabled,
+      build: this.state.babel.build,
+      circleciRepo: this.state.babel.circleciRepo,
       browsers: envConfig.browsers,
       builtIns: this.state.builtIns,
       code: this.state.code,
@@ -360,7 +385,8 @@ export default class Repl extends React.Component {
       presets: presetsArray.join(','),
       prettier: plugins.prettier.isEnabled,
       showSidebar: this.state.isSidebarExpanded,
-      targets: envConfigToTargetsString(envConfig)
+      targets: envConfigToTargetsString(envConfig),
+      version: this.state.babel.version,
     };
 
     StorageService.set('replState', state);
